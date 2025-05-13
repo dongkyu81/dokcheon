@@ -3,12 +3,12 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>꽃잔디 생육환경 대시보드 (시뮬레이션)</title>
+  <title>꽃잔디 생육환경 대시보드 (그래프 포함)</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #f0f9f0; color: #333; padding: 20px; }
-    h1 { text-align: center; font-size: 22px; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f9f0; padding: 20px; color: #333; }
+    h1 { text-align: center; font-size: 24px; margin-bottom: 10px; }
     .timestamp { text-align: center; font-size: 13px; margin-bottom: 20px; color: #888; }
-    .cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-bottom: 40px; }
+    .cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin-bottom: 20px; }
     .card {
       width: 160px;
       background: #fff;
@@ -16,6 +16,7 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.05);
       padding: 16px;
       text-align: center;
+      cursor: pointer;
     }
     .card img { width: 32px; margin-bottom: 6px; }
     .card h3 { font-size: 14px; margin: 5px 0; color: #2b7a5b; }
@@ -24,6 +25,8 @@
     .ok { background: #e6f4ea; color: #2e8b57; }
     .warn { background: #fff7d6; color: #d18c00; }
     .bad { background: #ffe6e6; color: #d13434; }
+    .graph-container { max-width: 600px; margin: 0 auto; display: none; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    canvas { width: 100% !important; height: 300px !important; }
   </style>
 </head>
 <body>
@@ -32,31 +35,31 @@
 <div class="timestamp" id="timestamp">데이터 수집 중...</div>
 
 <div class="cards">
-  <div class="card">
+  <div class="card" onclick="showGraph('lux')">
     <img src="https://cdn-icons-png.flaticon.com/512/869/869869.png" alt="일조량">
     <h3>일조량</h3>
     <div class="value" id="lux">-</div>
     <div class="status" id="luxStatus">-</div>
   </div>
-  <div class="card">
+  <div class="card" onclick="showGraph('moisture')">
     <img src="https://cdn-icons-png.flaticon.com/512/2900/2900481.png" alt="토양 수분">
     <h3>토양 수분</h3>
     <div class="value" id="moisture">-</div>
     <div class="status" id="moistureStatus">-</div>
   </div>
-  <div class="card">
+  <div class="card" onclick="showGraph('soilTemp')">
     <img src="https://cdn-icons-png.flaticon.com/512/728/728093.png" alt="토양 온도">
     <h3>토양 온도</h3>
     <div class="value" id="soilTemp">-</div>
     <div class="status" id="soilTempStatus">-</div>
   </div>
-  <div class="card">
+  <div class="card" onclick="showGraph('airTemp')">
     <img src="https://cdn-icons-png.flaticon.com/512/869/869869.png" alt="대기 온도">
     <h3>대기 온도</h3>
     <div class="value" id="airTemp">-</div>
     <div class="status" id="airTempStatus">-</div>
   </div>
-  <div class="card">
+  <div class="card" onclick="showGraph('humidity')">
     <img src="https://cdn-icons-png.flaticon.com/512/728/728093.png" alt="대기 습도">
     <h3>대기 습도</h3>
     <div class="value" id="humidity">-</div>
@@ -64,49 +67,103 @@
   </div>
 </div>
 
+<div class="graph-container" id="graphContainer">
+  <canvas id="sensorChart"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 function random(min, max) {
   return +(Math.random() * (max - min) + min).toFixed(1);
 }
 
+const dataLog = {
+  lux: [], moisture: [], soilTemp: [], airTemp: [], humidity: []
+};
+
+const chartLabels = [];
+
+const chartCtx = document.getElementById("sensorChart").getContext("2d");
+const sensorChart = new Chart(chartCtx, {
+  type: 'line',
+  data: {
+    labels: chartLabels,
+    datasets: []
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false }
+    },
+    scales: {
+      y: {
+        beginAtZero: false
+      }
+    }
+  }
+});
+
+function showGraph(sensor) {
+  const labels = chartLabels.slice();
+  const data = dataLog[sensor].slice();
+  sensorChart.data.labels = labels;
+  sensorChart.data.datasets = [{
+    label: sensor,
+    data: data,
+    borderColor: '#2e8b57',
+    backgroundColor: 'rgba(46,139,87,0.1)',
+    fill: true,
+    tension: 0.3,
+    pointRadius: 3
+  }];
+  sensorChart.update();
+  document.getElementById("graphContainer").style.display = 'block';
+}
+
 function updateData() {
+  const now = new Date();
+  const label = now.toLocaleTimeString("ko-KR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  chartLabels.push(label);
+  if (chartLabels.length > 10) chartLabels.shift();
+
   const data = {
     lux: random(10000, 18000),
-    soilMoisture: random(15, 45),
+    moisture: random(15, 45),
     soilTemp: random(10, 30),
     airTemp: random(10, 32),
-    airHumidity: random(35, 85)
+    humidity: random(35, 85)
   };
+
+  for (let key in data) {
+    dataLog[key].push(data[key]);
+    if (dataLog[key].length > 10) dataLog[key].shift();
+  }
 
   document.getElementById("lux").innerText = `${data.lux} lux`;
   document.getElementById("luxStatus").innerText = data.lux >= 15000 ? "적정" : "부족";
   document.getElementById("luxStatus").className = "status " + (data.lux >= 15000 ? "ok" : "bad");
 
-  document.getElementById("moisture").innerText = `${data.soilMoisture} %`;
-  let moistureStatus = "ok";
-  if (data.soilMoisture < 20) moistureStatus = "bad";
-  else if (data.soilMoisture > 35) moistureStatus = "warn";
-  document.getElementById("moistureStatus").innerText =
-    moistureStatus === "ok" ? "적정" : (moistureStatus === "warn" ? "과습" : "건조");
-  document.getElementById("moistureStatus").className = "status " + moistureStatus;
+  document.getElementById("moisture").innerText = `${data.moisture} %`;
+  let moistureClass = data.moisture < 20 ? "bad" : data.moisture > 35 ? "warn" : "ok";
+  document.getElementById("moistureStatus").innerText = moistureClass === "ok" ? "적정" : moistureClass === "warn" ? "과습" : "건조";
+  document.getElementById("moistureStatus").className = "status " + moistureClass;
 
   document.getElementById("soilTemp").innerText = `${data.soilTemp} ℃`;
-  let soilStatus = (data.soilTemp >= 15 && data.soilTemp <= 25) ? "ok" : "warn";
+  let soilStatus = data.soilTemp >= 15 && data.soilTemp <= 25 ? "ok" : "warn";
   document.getElementById("soilTempStatus").innerText = soilStatus === "ok" ? "적정" : "주의";
   document.getElementById("soilTempStatus").className = "status " + soilStatus;
 
   document.getElementById("airTemp").innerText = `${data.airTemp} ℃`;
-  let airStatus = (data.airTemp >= 10 && data.airTemp <= 28) ? "ok" : "warn";
+  let airStatus = data.airTemp >= 10 && data.airTemp <= 28 ? "ok" : "warn";
   document.getElementById("airTempStatus").innerText = airStatus === "ok" ? "적정" : "주의";
   document.getElementById("airTempStatus").className = "status " + airStatus;
 
-  document.getElementById("humidity").innerText = `${data.airHumidity} %`;
-  let humStatus = (data.airHumidity >= 40 && data.airHumidity <= 70) ? "ok" : "warn";
+  document.getElementById("humidity").innerText = `${data.humidity} %`;
+  let humStatus = data.humidity >= 40 && data.humidity <= 70 ? "ok" : "warn";
   document.getElementById("humidityStatus").innerText = humStatus === "ok" ? "적정" : "주의";
   document.getElementById("humidityStatus").className = "status " + humStatus;
 
-  document.getElementById("timestamp").innerText =
-    `데이터 수집 시간: ${new Date().toLocaleString("ko-KR")}`;
+  document.getElementById("timestamp").innerText = `데이터 수집 시간: ${now.toLocaleString("ko-KR")}`;
 }
 
 updateData();
